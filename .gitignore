@@ -1,0 +1,5 @@
+/.DS_Store
+/.vscode
+/__pycache__
+/photo_tagging.log
+/run_docker_private.sh

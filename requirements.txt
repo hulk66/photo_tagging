@@ -1,0 +1,4 @@
+openai
+PyExifTool
+pillow-heif
+tqdm
