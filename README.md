@@ -10,7 +10,7 @@ A Python application that automatically tags photos with metadata including keyw
 - Integration with OpenAI API for image analysis
 - Docker containerization for easy deployment
 
-## Example in Immich
+## Result in Immich
 ![Description](img/description.png)
 ![tags](img/tags.png)
 
