@@ -25,10 +25,9 @@ I run this locally using [Ollama](https://ollama.com/) and [Open WebUI](https://
 ## Installation
 
 ### Using Docker (Recommended)
-Pull and run the image:
+Pull and run the image. The Logfile will be created in the current directory:
 ```bash
-docker pull hulk66/photo-tagging:latest
-docker run -v ./MY_LOG.log:/var/log/photo_tagging.log \
+docker run -v ./:/var/log \
     -v YOUR_PHOTO_DIR:/app/images \
     hulk66/photo-tagging python tagger.py \
     --ai_server YOUR_AI_SERVER \
