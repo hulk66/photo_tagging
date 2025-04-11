@@ -1,3 +1,19 @@
+"""
+This script processes image files in a given directory, generating tags, headlines, and abstracts for each image using an AI model. 
+It supports HEIC to JPG conversion and writes metadata back to the images using ExifTool.
+
+Copyright (C) 2025 Tobias Himstedt
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, 
+either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. 
+If not, see <https://www.gnu.org/licenses/>.
+"""
+import logging.config
 import os
 from datetime import datetime
 from openai import OpenAI
@@ -14,6 +30,7 @@ import argparse
 from tqdm import tqdm
 
 
+
 # Initialize OpenAI API client
 # OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 #client = OpenAI( base_url="https://chat.himstedt.org/ollama/v1", api_key="sk-57423e2d0e784b82bf9edac670b039a1")
@@ -21,6 +38,7 @@ from tqdm import tqdm
 TAGS_PROMPT = "generate 5-10 tags in for the given image. Separate tags with commas. Return each tag in English and German language. Just respond with the tags."
 HEADLINE_PROMPT = "Generate a headline of the image. Just respond with the headline."
 ABSTRACT_PROMPT = "Generate a short abstract of the image. Just respond with the abstract."
+logger = logging.getLogger(__name__)
 
 def describe_image_by_model(image_path:str, prompt:str, model:str) -> str:
     """
@@ -58,7 +76,7 @@ def describe_image_by_model(image_path:str, prompt:str, model:str) -> str:
     return result
 
 def connect_llm(image_path:str, prompt:str, model:str) -> str:
-    logging.info(f"Connecting to LLM with image: {image_path} and prompt: {prompt}")
+    logger.info(f"Connecting to LLM with image: {image_path} and prompt: {prompt}")
     with open(image_path, "rb") as image_file:
         encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
 
@@ -97,11 +115,11 @@ def parse_json_result(result:str) -> dict:
         parsed_result = json.loads(result)
         return parsed_result
     except json.JSONDecodeError as e:
-        logging.error(f"JSON decoding error: {str(e)}")
+        logger.error(f"JSON decoding error: {str(e)}")
         return {}
     
 def generate_image_tags(image_path, model="gemma3:27b"):
-    logging.info(f"Generating tags for image: {image_path}")
+    logger.info(f"Generating tags for image: {image_path}")
     tags = connect_llm(image_path, TAGS_PROMPT, model)
     tags = tags.split(",")
     # remove leading and trailing whitespace from each tag
@@ -109,16 +127,16 @@ def generate_image_tags(image_path, model="gemma3:27b"):
     return tags
 
 def generate_image_headline(image_path, model="gemma3:27b"):
-    logging.info(f"Generating description for image: {image_path}")
+    logger.info(f"Generating description for image: {image_path}")
     return connect_llm(image_path, HEADLINE_PROMPT, model)
 
 def generate_image_abstract(image_path, model="gemma3:27b"):
-    logging.info(f"Generating abstract for image: {image_path}")
+    logger.info(f"Generating abstract for image: {image_path}")
     return connect_llm(image_path, ABSTRACT_PROMPT, model)
 
 def get_image_files(directory):
     """Get list of image files in directory"""
-    logging.info(f"Getting image files from directory: {directory}")
+    logger.info(f"Getting image files from directory: {directory}")
     image_files = []
     for root, dirs, files in os.walk(directory):
         for file in files:
@@ -136,7 +154,7 @@ def convert_heic_to_jpg(heic_path):
     Returns:
         str: Path to the temporary JPG image file
     """
-    logging.info(f"Converting HEIC to temp JPG: {heic_path}")
+    logger.info(f"Converting HEIC to temp JPG: {heic_path}")
     try:
         # Open the HEIC image using Pillow
         with Image.open(heic_path) as heic_image:
@@ -149,11 +167,11 @@ def convert_heic_to_jpg(heic_path):
             return temp_jpg.name
             
     except Exception as e:
-        logging.error(f"Error converting HEIC to JPG: {str(e)}")
+        logger.error(f"Error converting HEIC to JPG: {str(e)}")
         return None
 
 def test_combind_prompting(image_path:str, model:str, overwrite=False) -> None:
-    logging.info(f"Processing image: {image_path}")
+    logger.info(f"Processing image: {image_path}")
     PROMPT = """
         Analyze this image. Respond in json format with the following elements:
         5-10 tags in english language. Separate tags with commas. Append the same tags in german language to the list.
@@ -174,13 +192,18 @@ def test_combind_prompting(image_path:str, model:str, overwrite=False) -> None:
             tags = helper.get_tags(image_path, tags=["XMP-dc:Subject", "IPTC:Keywords"])
             # Check if the image already has tags   
             if tags and not overwrite and ("XMP:Subject" in tags[0] or "IPTC:Keywords" in tags[0]):
-                logging.info("Image already has tags. Skipping...")
+                logger.info("Image already has tags. Skipping...")
             else:
                 json_result = describe_image_by_model(image_path, PROMPT, model)
                 result = parse_json_result(json_result)
                 tags = result.get("tags", [])
-                headline = result.get("headline", "")
-                abstract = result.get("abstract", "")
+                # remove leading and trailing whitespace from each tag
+                tags = [tag.strip() for tag in tags]
+                headline = result.get("headline", "").strip()
+                abstract = result.get("abstract", "").strip()
+                logger.debug(f"Tags: {tags}")
+                logger.debug(f"Headline: {headline}")
+                logger.debug(f"Abstract: {abstract}")
                 # tags = generate_image_tags(jpg_image)
                 helper.set_tags(image_path, 
                     tags = { 
@@ -189,19 +212,20 @@ def test_combind_prompting(image_path:str, model:str, overwrite=False) -> None:
                         "IPTC:Writer-Editor": model,
                         "IPTC:Headline": headline,
                         "XMP-dc:Title": headline,
+                        "EXIF:ImageDescription": headline,
                         "IPTC:Caption-Abstract": abstract,
                         "XMP-dc:Description": abstract 
                     }, params=[]
                 )
     except Exception as e:
-        logging.error(f"ExifTool execution error: {str(e)}")
+        logger.error(f"ExifTool execution error: {str(e)}")
 
 def process_image(image_path:str, model:str, overwrite=False) -> None:
     """Process a single image file"""
-    logging.info(f"Processing image: {image_path}")
+    logger.info(f"Processing image: {image_path}")
     # Check if the file exists
     if not os.path.isfile(image_path):
-        logging.error(f"The file does not exist: {image_path}")
+        logger.error(f"The file does not exist: {image_path}")
         return
 
     jpg_image = image_path
@@ -213,7 +237,7 @@ def process_image(image_path:str, model:str, overwrite=False) -> None:
             tags = helper.get_tags(image_path, tags=["XMP-dc:Subject", "IPTC:Keywords"])
             # Check if the image already has tags   
             if tags and not overwrite and ("XMP:Subject" in tags[0] or "IPTC:Keywords" in tags[0]):
-                logging.info("Image already has tags. Skipping...")
+                logger.info("Image already has tags. Skipping...")
             else:
                 tags = generate_image_tags(jpg_image)
                 helper.set_tags(image_path, 
@@ -227,7 +251,7 @@ def process_image(image_path:str, model:str, overwrite=False) -> None:
             # Check if the image already has a description
             headline = helper.get_tags(image_path, tags=["XMP-dc:Title", "IPTC:Headline"])
             if headline and not overwrite and ("XMP:Title" in headline[0] or "IPTC:Headline" in headline[0]):
-                logging.info("Image already has description. Skipping...")
+                logger.info("Image already has description. Skipping...")
             else:
                 headline = generate_image_headline(jpg_image)
                 helper.set_tags(image_path, 
@@ -240,7 +264,7 @@ def process_image(image_path:str, model:str, overwrite=False) -> None:
             # Check if the image already has an abstract
             abstract = helper.get_tags(image_path, tags=["XMP-dc:Description", "IPTC:Caption-Abstract"])
             if abstract and not overwrite and ("XMP:Description" in abstract[0] or "IPTC:Caption-Abstract" in abstract[0]):
-                logging.info("Image already has abstract. Skipping...")
+                logger.info("Image already has abstract. Skipping...")
             else:
                 abstract = generate_image_abstract(jpg_image)
                 helper.set_tags(image_path, 
@@ -251,7 +275,7 @@ def process_image(image_path:str, model:str, overwrite=False) -> None:
                     }, params=[]
                 )
     except Exception as e:
-        logging.error(f"ExifTool execution error: {str(e)}")
+        logger.error(f"ExifTool execution error: {str(e)}")
 
 def run(directory:str, model:str, overwrite:bool=False) -> None:
     """Main function to process all images in directory"""
@@ -259,20 +283,26 @@ def run(directory:str, model:str, overwrite:bool=False) -> None:
 
     image_files = get_image_files(directory)
     
+    counter = 0
+    total = len(image_files)
     for image_path in tqdm(image_files, desc="Processing images...", leave=False):
         test_combind_prompting(image_path, model=model, overwrite=overwrite)
+        logger.info(f"Processed {counter}/{total} images")
+        counter += 1
         # process_image(image_path, model, overwrite)
-    logging.info(f"Processed {len(image_files)} images in directory: {directory}")
+    logger.info(f"Processed {total} images in directory: {directory}")
 
 def main():
-    global client, log_file
+    global client, log_file, verbose
+
     parser = argparse.ArgumentParser(description='My script description')
     parser.add_argument('directory', type=str, help='Directory to process', default= ".")
     parser.add_argument('--model', type=str, help='Model to use', default="gemma3:27b")
-    parser.add_argument('--overwrite', help='Overwrite existing tag, headline and abstract', default=False)
+    parser.add_argument('--overwrite', action=argparse.BooleanOptionalAction, help='Overwrite existing tag, headline and abstract', default=False)
     parser.add_argument('--ai_server', type=str, help='URL of AI server to use', required=True)
     parser.add_argument('--api_key', type=str, help='API key to use', required=True)
     parser.add_argument('--log_file', type=str, help='Where to put the log file', default="/var/log/photo_tagger.log")
+    parser.add_argument('--verbose', action=argparse.BooleanOptionalAction, help='Log tag, headline and description', default=False)
 
     args = parser.parse_args()
     directory = args.directory
@@ -281,14 +311,20 @@ def main():
     ai_server = args.ai_server
     api_key = args.api_key
     log_file = args.log_file
+    verbose = args.verbose
     # Configure logging to file
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.WARNING,
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[
-            RotatingFileHandler(log_file, maxBytes=10**6, backupCount=5),
+            RotatingFileHandler(log_file, maxBytes=10**7, backupCount=5),
         ]
     )
+    # set log level to DEBUG if verbose is True
+    if verbose:
+        logger.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
 
     client = OpenAI(base_url=ai_server, api_key=api_key)
     run(directory, model=model, overwrite=overwrite)
