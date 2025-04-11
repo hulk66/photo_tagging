@@ -1,18 +1,21 @@
 # Photo Tagger
-A Python application that automatically tags photos with metadata including keywords, headlines, and abstracts using AI-powered image analysis. The metadata is written back to the image, so that every capable photo library application (e.g. [Immich](https://immich.app/)) can read this.
+A Python script that automatically tags photos with metadata including keywords, headlines, and abstracts using AI-powered image analysis. The metadata is written back to the image, so that every capable photo library application (e.g. [Immich](https://immich.app/)) can read this.
 
 
 ## Features
 - Automatic generation of keywords/tags based on image content. This version creates English and German keywords. Feel free to modify to your needs
 - Generation of headlines and abstracts for images
 - Support for IPTC and XMP metadata standards
-- Batch processing of multiple (JPG, HEIC) images in a directory
+- Recursive batch processing of multiple (JPG, HEIC) images in a directory
 - Integration with OpenAI API for image analysis
 - Docker containerization for easy deployment
 
 ## Result in Immich
 ![Description](img/description.png)
 ![tags](img/tags.png)
+
+## Performance
+I run this locally using [Ollama](https://ollama.com/) and [Open WebUI](https://openwebui.com/) with [Gemma3 27b](https://ollama.com/library/gemma3) on an Apple M4 Max. Per photo it takes around 20-25sec. With more capabale hardware (Nvidia 4090, 5090, currenty impossible to get anything with a reasonable pricing) or a cloud service this is probably dramatatically faster.
 
 ## Requirements
 - Python 3.12+
