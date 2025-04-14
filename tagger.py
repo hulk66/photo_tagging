@@ -170,7 +170,7 @@ def convert_heic_to_jpg(heic_path):
         logger.error(f"Error converting HEIC to JPG: {str(e)}")
         return None
 
-def prompt_llm(image_path:str, model:str, overwrite=False) -> None:
+def process_image(image_path:str, model:str, overwrite=False) -> None:
     logger.info(f"Processing image: {image_path}")
     PROMPT = """
         Analyze this image. Respond in json format with the following elements:
@@ -191,7 +191,8 @@ def prompt_llm(image_path:str, model:str, overwrite=False) -> None:
         with exiftool.ExifToolHelper() as helper:
             tags = helper.get_tags(image_path, tags=["XMP-dc:Subject", "IPTC:Keywords"])
             # Check if the image already has tags   
-            if tags and not overwrite and ("XMP:Subject" in tags[0] or "IPTC:Keywords" in tags[0]):
+            if tags and not overwrite \
+                and ("XMP:Subject" in tags[0] or "IPTC:Keywords" in tags[0]):
                 logger.info("Image already has tags. Skipping...")
             else:
                 json_result = describe_image_by_model(image_path, PROMPT, model)
@@ -220,7 +221,7 @@ def prompt_llm(image_path:str, model:str, overwrite=False) -> None:
     except Exception as e:
         logger.error(f"ExifTool execution error: {str(e)}")
 
-def process_image(image_path:str, model:str, overwrite=False) -> None:
+def process_image_old(image_path:str, model:str, overwrite=False) -> None:
     """Process a single image file"""
     logger.info(f"Processing image: {image_path}")
     # Check if the file exists
@@ -286,7 +287,7 @@ def run(directory:str, model:str, overwrite:bool=False) -> None:
     counter = 0
     total = len(image_files)
     for image_path in tqdm(image_files, desc="Processing images...", leave=False):
-        prompt_llm(image_path, model=model, overwrite=overwrite)
+        process_image(image_path, model=model, overwrite=overwrite)
         logger.info(f"Processed {counter}/{total} images")
         counter += 1
         # process_image(image_path, model, overwrite)
