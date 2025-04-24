@@ -195,7 +195,11 @@ def process_image(image_path:str, model:str, overwrite=False) -> None:
                 and ("XMP:Subject" in tags[0] or "IPTC:Keywords" in tags[0]):
                 logger.info("Image already has tags. Skipping...")
             else:
-                json_result = describe_image_by_model(image_path, PROMPT, model)
+                jpg_image = image_path
+                if image_path.lower().endswith('.heic'):
+                    jpg_image = convert_heic_to_jpg(image_path)
+
+                json_result = describe_image_by_model(jpg_image, PROMPT, model)
                 result = parse_json_result(json_result)
                 tags = result.get("tags", [])
                 # remove leading and trailing whitespace from each tag
