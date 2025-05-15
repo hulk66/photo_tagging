@@ -31,10 +31,6 @@ from tqdm import tqdm
 
 
 
-# Initialize OpenAI API client
-# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-#client = OpenAI( base_url="https://chat.himstedt.org/ollama/v1", api_key="sk-57423e2d0e784b82bf9edac670b039a1")
-
 TAGS_PROMPT = "generate 5-10 tags in for the given image. Separate tags with commas. Return each tag in English and German language. Just respond with the tags."
 HEADLINE_PROMPT = "Generate a headline of the image. Just respond with the headline."
 ABSTRACT_PROMPT = "Generate a short abstract of the image. Just respond with the abstract."
