@@ -184,7 +184,7 @@ def process_image(image_path:str, model:str, overwrite=False) -> None:
         """
 
     try:
-        with exiftool.ExifToolHelper() as helper:
+        with exiftool.ExifToolHelper(common_args=["-G", "-n", "-P", "-overwrite_original_in_place"]) as helper:
             tags = helper.get_tags(image_path, tags=["XMP-dc:Subject", "IPTC:Keywords"])
             # Check if the image already has tags   
             if tags and not overwrite \
