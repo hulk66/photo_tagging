@@ -36,7 +36,7 @@ HEADLINE_PROMPT = "Generate a headline of the image. Just respond with the headl
 ABSTRACT_PROMPT = "Generate a short abstract of the image. Just respond with the abstract."
 logger = logging.getLogger(__name__)
 
-def describe_image_by_model(image_path:str, prompt:str, model:str) -> str:
+def describe_image_by_model(image_path:str, prompt:str, schema:dict, model:str) -> str:
     """
     Connect to the LLM and get a response for the given image and prompt.
     Args:
@@ -47,10 +47,16 @@ def describe_image_by_model(image_path:str, prompt:str, model:str) -> str:
         str: The JSON response from the LLM
     """
     logging.info(f"Connecting to LLM with image: {image_path}")
+    
+    # Debug log: Log the schema being used
+    logger.debug(f"Schema being used: {json.dumps(schema, indent=2)}")
+    
     with open(image_path, "rb") as image_file:
         encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
 
     detail="auto"
+    
+    # Debug log: Log the payload structure
     payload = {
         "model": model,
         "messages": [
@@ -58,18 +64,32 @@ def describe_image_by_model(image_path:str, prompt:str, model:str) -> str:
                 "role": "user",
                 "content": [
                     {"type": "text", "text": prompt},
-                    {"type": 
+                    {"type":
                         "image_url",
                         "image_url": {"url": f"data:image/jpeg;base64,{encoded_image}", "detail": detail}}
                 ]
             }
         ],
-        "response_format": {"type": "json_object"}
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "image description",
+                "schema": schema
+            }
+        }
     }
-
-    response = client.chat.completions.create(**payload)
-    result = response.choices[0].message.content
-    return result
+    
+    logger.debug(f"Payload response_format: {json.dumps(payload['response_format'], indent=2)}")
+    
+    try:
+        response = client.chat.completions.create(**payload)
+        result = response.choices[0].message.content
+        logger.debug(f"Raw LLM response: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"Error calling LLM: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        raise
 
 def connect_llm(image_path:str, prompt:str, model:str) -> str:
     logger.info(f"Connecting to LLM with image: {image_path} and prompt: {prompt}")
@@ -183,10 +203,22 @@ def process_image(image_path:str, model:str, overwrite=False) -> None:
         Do not add any other text. Just respond with the json object.        
         """
 
+    schema = {
+        "type": "object",
+        "properties": {
+            "tags": {
+                "type": "array",
+                "items": {"type": "string"}
+            },
+            "headline": {"type": "string"},
+            "abstract": {"type": "string"}
+        },
+        "required": ["tags", "headline", "abstract"]
+    }
     try:
         with exiftool.ExifToolHelper(common_args=["-G", "-n", "-P", "-overwrite_original_in_place"]) as helper:
             tags = helper.get_tags(image_path, tags=["XMP-dc:Subject", "IPTC:Keywords"])
-            # Check if the image already has tags   
+            # Check if the image already has tags
             if tags and not overwrite \
                 and ("XMP:Subject" in tags[0] or "IPTC:Keywords" in tags[0]):
                 logger.info("Image already has tags. Skipping...")
@@ -195,7 +227,8 @@ def process_image(image_path:str, model:str, overwrite=False) -> None:
                 if image_path.lower().endswith('.heic'):
                     jpg_image = convert_heic_to_jpg(image_path)
 
-                json_result = describe_image_by_model(jpg_image, PROMPT, model)
+                logger.info(f"Processing image with model: {model}")
+                json_result = describe_image_by_model(jpg_image, PROMPT, schema, model)
                 result = parse_json_result(json_result)
                 tags = result.get("tags", [])
                 # remove leading and trailing whitespace from each tag
@@ -319,6 +352,7 @@ def main():
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[
             RotatingFileHandler(log_file, maxBytes=10**7, backupCount=5),
+            logging.StreamHandler()
         ]
     )
     # set log level to DEBUG if verbose is True
